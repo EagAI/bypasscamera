@@ -128,8 +128,8 @@
       // iOS Safari needs explicit play after user gesture
       video.play().catch(() => {});
 
-      // Check if torch/flash is supported
-      checkTorchSupport();
+      // Check torch support once video is actually playing (track fully ready)
+      video.addEventListener('playing', () => checkTorchSupport(), { once: true });
     } catch (err) {
       console.error('Camera error:', err);
 
@@ -163,42 +163,56 @@
   // ---- Flash / Torch ----
   function checkTorchSupport() {
     torchSupported = false;
-    if (!currentStream) return;
+    if (!currentStream) { updateFlashUI(); return; }
 
     const track = currentStream.getVideoTracks()[0];
-    if (!track) return;
+    if (!track) { updateFlashUI(); return; }
 
-    try {
-      const capabilities = track.getCapabilities();
-      if (capabilities && capabilities.torch) {
-        torchSupported = true;
+    // On rear camera, default to enabled and let toggleFlash handle failures
+    if (facingMode === 'environment') {
+      try {
+        const capabilities = track.getCapabilities();
+        if (capabilities && capabilities.torch) {
+          torchSupported = true;
+        }
+      } catch (e) {
+        // getCapabilities not supported — still allow attempting torch
       }
-    } catch (e) {
-      // getCapabilities not supported (e.g. iOS Safari)
+
+      // Even if getCapabilities didn't report torch, enable the button on
+      // rear camera so the user can try. toggleFlash will handle errors.
+      if (!torchSupported) {
+        torchSupported = true; // optimistic — toggleFlash will correct if needed
+      }
     }
 
     updateFlashUI();
   }
 
   async function toggleFlash() {
-    if (!torchSupported || !currentStream) return;
+    if (!currentStream) return;
 
-    flashOn = !flashOn;
     const track = currentStream.getVideoTracks()[0];
     if (!track) return;
 
+    const newState = !flashOn;
+
     try {
-      await track.applyConstraints({ advanced: [{ torch: flashOn }] });
+      await track.applyConstraints({ advanced: [{ torch: newState }] });
+      flashOn = newState;
     } catch (e) {
       console.error('Flash error:', e);
       flashOn = false;
+      // Torch not actually supported — disable button
+      torchSupported = false;
     }
 
     updateFlashUI();
   }
 
   function updateFlashUI() {
-    if (!torchSupported) {
+    // Hide flash on front camera, show on rear
+    if (facingMode === 'user' || !torchSupported) {
       flashBtn.style.opacity = '0.35';
       flashBtn.style.pointerEvents = 'none';
     } else {
