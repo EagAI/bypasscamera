@@ -18,9 +18,6 @@
   <div id="viewfinder">
     <video id="video" autoplay playsinline muted></video>
 
-    <!-- Live timestamp overlay (shown on viewfinder) -->
-    <div id="timestampOverlay" class="timestamp-overlay"></div>
-
     <!-- Top bar -->
     <div class="top-bar">
       <button id="flipBtn" class="icon-btn" title="Flip Camera">
@@ -28,6 +25,11 @@
           <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
           <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"/>
           <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"/>
+        </svg>
+      </button>
+      <button id="flashBtn" class="icon-btn" title="Toggle Flash">
+        <svg id="flashIcon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
         </svg>
       </button>
       <button id="settingsBtn" class="icon-btn" title="Timestamp Settings">

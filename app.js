@@ -9,6 +9,8 @@
   const video = document.getElementById('video');
   const captureBtn = document.getElementById('captureBtn');
   const flipBtn = document.getElementById('flipBtn');
+  const flashBtn = document.getElementById('flashBtn');
+  const flashIcon = document.getElementById('flashIcon');
   const settingsBtn = document.getElementById('settingsBtn');
   const settingsSheet = document.getElementById('settingsSheet');
   const sheetBackdrop = document.getElementById('sheetBackdrop');
@@ -17,7 +19,6 @@
   const timeMode = document.getElementById('timeMode');
   const customTimeRow = document.getElementById('customTimeRow');
   const customTimeInput = document.getElementById('customTime');
-  const timestampOverlay = document.getElementById('timestampOverlay');
   const captureCanvas = document.getElementById('captureCanvas');
   const previewOverlay = document.getElementById('previewOverlay');
   const previewImg = document.getElementById('previewImg');
@@ -32,7 +33,8 @@
   let timestampMode = 'current'; // 'current' | 'custom'
   let customDateTime = '';
   let capturedBlob = null;
-  let overlayInterval = null;
+  let flashOn = false;
+  let torchSupported = false;
 
   // ---- Initialize ----
   init();
@@ -48,9 +50,6 @@
     // Start camera
     startCamera();
 
-    // Start live overlay
-    startOverlayTimer();
-
     // Show share button if supported
     if (navigator.share) {
       shareBtn.style.display = 'inline-flex';
@@ -59,6 +58,7 @@
     // Bind events
     captureBtn.addEventListener('click', capturePhoto);
     flipBtn.addEventListener('click', flipCamera);
+    flashBtn.addEventListener('click', toggleFlash);
     settingsBtn.addEventListener('click', openSettings);
     sheetBackdrop.addEventListener('click', closeSettings);
     settingsCloseBtn.addEventListener('click', closeSettings);
@@ -69,20 +69,17 @@
     timestampToggle.addEventListener('change', () => {
       timestampEnabled = timestampToggle.checked;
       saveSettings();
-      updateOverlay();
     });
 
     timeMode.addEventListener('change', () => {
       timestampMode = timeMode.value;
       customTimeRow.classList.toggle('hidden', timestampMode !== 'custom');
       saveSettings();
-      updateOverlay();
     });
 
     customTimeInput.addEventListener('input', () => {
       customDateTime = customTimeInput.value;
       saveSettings();
-      updateOverlay();
     });
 
     // Register service worker
@@ -97,6 +94,10 @@
     if (currentStream) {
       currentStream.getTracks().forEach(t => t.stop());
     }
+
+    // Reset flash state on camera switch
+    flashOn = false;
+    updateFlashUI();
 
     // Hide any previous error / start-camera prompt
     hideCameraOverlay();
@@ -126,6 +127,9 @@
 
       // iOS Safari needs explicit play after user gesture
       video.play().catch(() => {});
+
+      // Check if torch/flash is supported
+      checkTorchSupport();
     } catch (err) {
       console.error('Camera error:', err);
 
@@ -156,6 +160,62 @@
     startCamera();
   }
 
+  // ---- Flash / Torch ----
+  function checkTorchSupport() {
+    torchSupported = false;
+    if (!currentStream) return;
+
+    const track = currentStream.getVideoTracks()[0];
+    if (!track) return;
+
+    try {
+      const capabilities = track.getCapabilities();
+      if (capabilities && capabilities.torch) {
+        torchSupported = true;
+      }
+    } catch (e) {
+      // getCapabilities not supported (e.g. iOS Safari)
+    }
+
+    updateFlashUI();
+  }
+
+  async function toggleFlash() {
+    if (!torchSupported || !currentStream) return;
+
+    flashOn = !flashOn;
+    const track = currentStream.getVideoTracks()[0];
+    if (!track) return;
+
+    try {
+      await track.applyConstraints({ advanced: [{ torch: flashOn }] });
+    } catch (e) {
+      console.error('Flash error:', e);
+      flashOn = false;
+    }
+
+    updateFlashUI();
+  }
+
+  function updateFlashUI() {
+    if (!torchSupported) {
+      flashBtn.style.opacity = '0.35';
+      flashBtn.style.pointerEvents = 'none';
+    } else {
+      flashBtn.style.opacity = '1';
+      flashBtn.style.pointerEvents = 'auto';
+    }
+
+    if (flashOn) {
+      flashBtn.classList.add('flash-active');
+      flashIcon.setAttribute('fill', 'currentColor');
+    } else {
+      flashBtn.classList.remove('flash-active');
+      flashIcon.setAttribute('fill', 'none');
+    }
+  }
+
+  // ---- Camera Overlay (errors / permission prompt) ----
   function showCameraOverlay(title, message, buttonText) {
     let overlay = document.getElementById('cameraOverlay');
     if (!overlay) {
@@ -222,13 +282,12 @@
   function formatDateTime(d) {
     if (isNaN(d.getTime())) return '';
 
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
     const hours = String(d.getHours()).padStart(2, '0');
     const minutes = String(d.getMinutes()).padStart(2, '0');
-    const seconds = String(d.getSeconds()).padStart(2, '0');
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
   }
 
   function toLocalISOString(d) {
@@ -240,17 +299,6 @@
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   }
 
-  function updateOverlay() {
-    const text = getTimestampText();
-    timestampOverlay.textContent = text;
-    timestampOverlay.style.display = text ? 'block' : 'none';
-  }
-
-  function startOverlayTimer() {
-    updateOverlay();
-    overlayInterval = setInterval(updateOverlay, 1000);
-  }
-
   // ---- Capture ----
   function capturePhoto() {
     const vw = video.videoWidth;
@@ -259,8 +307,6 @@
     if (!vw || !vh) return; // video not ready
 
     // Detect orientation mismatch: phone is portrait but video stream is landscape.
-    // The camera sensor natively outputs landscape frames; when held portrait we
-    // need to rotate the captured frame 90° so the saved image is portrait.
     const isPortrait = window.innerHeight > window.innerWidth;
     const videoIsLandscape = vw > vh;
     const needsRotation = isPortrait && videoIsLandscape;
@@ -275,7 +321,6 @@
     ctx.save();
 
     if (needsRotation) {
-      // Rotate 90° clockwise so the landscape frame becomes portrait
       ctx.translate(canvasW, 0);
       ctx.rotate(Math.PI / 2);
     }
@@ -289,20 +334,20 @@
     ctx.drawImage(video, 0, 0, vw, vh);
     ctx.restore();
 
-    // Draw timestamp on the properly-oriented canvas
+    // Draw timestamp on the captured image (only here, not on live viewfinder)
     const text = getTimestampText();
     if (text) {
-      const fontSize = Math.max(Math.round(canvasW * 0.028), 16);
+      const fontSize = Math.max(Math.round(canvasW * 0.042), 20);
       ctx.font = `bold ${fontSize}px 'Courier New', Courier, monospace`;
-      ctx.fillStyle = '#ffa726';
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-      ctx.shadowBlur = 4;
-      ctx.shadowOffsetX = 1;
-      ctx.shadowOffsetY = 1;
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+      ctx.shadowBlur = 6;
+      ctx.shadowOffsetX = 2;
+      ctx.shadowOffsetY = 2;
       ctx.textAlign = 'right';
       ctx.textBaseline = 'bottom';
 
-      const padding = Math.round(canvasW * 0.025);
+      const padding = Math.round(canvasW * 0.03);
       ctx.fillText(text, canvasW - padding, canvasH - padding);
     }
 
@@ -353,7 +398,6 @@
         files: [file]
       });
     } catch (err) {
-      // User cancelled or share failed — ignore
       if (err.name !== 'AbortError') {
         console.error('Share error:', err);
       }

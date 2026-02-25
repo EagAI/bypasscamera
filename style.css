@@ -109,6 +109,11 @@ body.camera-page {
   background: rgba(255, 255, 255, 0.15);
 }
 
+.icon-btn.flash-active {
+  background: rgba(255, 204, 0, 0.3);
+  color: #ffcc00;
+}
+
 .hidden {
   display: none !important;
 }
