@@ -2,7 +2,7 @@
    Timestamp Camera PWA — Service Worker
    ======================================== */
 
-const CACHE_NAME = 'ts-camera-v4';
+const CACHE_NAME = 'ts-camera-v5';
 const ASSETS = [
   './',
   'index.html',
