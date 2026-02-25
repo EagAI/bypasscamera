@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Timestamp Cam">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <title>Timestamp Camera</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="camera-page">
+
+  <!-- Camera viewfinder -->
+  <div id="viewfinder">
+    <video id="video" autoplay playsinline muted></video>
+
+    <!-- Live timestamp overlay (shown on viewfinder) -->
+    <div id="timestampOverlay" class="timestamp-overlay"></div>
+
+    <!-- Top bar -->
+    <div class="top-bar">
+      <button id="flipBtn" class="icon-btn" title="Flip Camera">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"/>
+          <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"/>
+        </svg>
+      </button>
+      <button id="settingsBtn" class="icon-btn" title="Timestamp Settings">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Bottom bar with capture button -->
+    <div class="bottom-bar">
+      <button id="captureBtn" class="capture-btn" title="Take Photo">
+        <span class="capture-ring"></span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Preview overlay (shown after capture) -->
+  <div id="previewOverlay" class="preview-overlay hidden">
+    <div class="preview-topbar">
+      <button id="previewCloseBtn" class="icon-btn" title="Retake">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <img id="previewImg" class="preview-img" alt="Captured photo">
+    <div class="preview-actions">
+      <button id="downloadBtn" class="btn btn-primary">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Save
+      </button>
+      <button id="shareBtn" class="btn btn-secondary" style="display:none;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+        Share
+      </button>
+    </div>
+  </div>
+
+  <!-- Settings bottom sheet -->
+  <div id="settingsSheet" class="settings-sheet hidden">
+    <div class="sheet-backdrop" id="sheetBackdrop"></div>
+    <div class="sheet-content">
+      <div class="sheet-handle"></div>
+      <h2 class="sheet-title">Timestamp Settings</h2>
+
+      <!-- Toggle timestamp -->
+      <div class="setting-row">
+        <label for="timestampToggle">Show Timestamp</label>
+        <label class="switch">
+          <input type="checkbox" id="timestampToggle" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <!-- Time mode -->
+      <div class="setting-row">
+        <label for="timeMode">Time Mode</label>
+        <select id="timeMode" class="setting-select">
+          <option value="current">Current Time</option>
+          <option value="custom">Custom Time</option>
+        </select>
+      </div>
+
+      <!-- Custom time picker (shown when mode = custom) -->
+      <div id="customTimeRow" class="setting-row hidden">
+        <label for="customTime">Custom Date & Time</label>
+        <input type="datetime-local" id="customTime" class="setting-input">
+      </div>
+
+      <button id="settingsCloseBtn" class="btn btn-primary sheet-close-btn">Done</button>
+    </div>
+  </div>
+
+  <!-- Hidden canvas for capture -->
+  <canvas id="captureCanvas" style="display:none;"></canvas>
+
+  <script src="app.js"></script>
+</body>
+</html>
